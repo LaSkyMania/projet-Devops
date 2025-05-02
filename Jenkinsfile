@@ -23,10 +23,10 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Créer le Dockerfile
+                    // Créer le Dockerfile avec la version mise à jour
                     sh '''
-                        echo "FROM nginx:alpine
-                        RUN apk update && apk add --no-cache net-tools iproute2 iputils
+                        echo "FROM nginx
+                        RUN apt update && apt install -y net-tools iproute2 iputils-ping ssh vim
                         COPY . /usr/share/nginx/html
                         EXPOSE 80
                         " > Dockerfile
