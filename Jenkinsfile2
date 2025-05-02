@@ -1,0 +1,93 @@
+pipeline {
+    agent any
+    environment {
+        IMAGE_NAME = 'myapp-image'
+        CONTAINER_NAME = 'myapp'
+        REPO_URL = 'https://github.com/LaSkyMania/projet-Devops.git'
+    }
+    stages {
+        stage('Clean Workspace') {
+            steps {
+                script {
+                    // Nettoyage des anciens fichiers Docker et de l'espace
+                    sh 'docker system prune -f'
+                    sh 'docker volume prune -f'
+                    sh 'docker network prune -f'
+                    cleanWs()
+                }
+            }
+        }
+        stage('Clone Repository') {
+            steps {
+                script {
+                    // Vérification et clonage du repo Git
+                    if (fileExists('projet-Devops')) {
+                        sh 'rm -rf projet-Devops'
+                    }
+                    sh "git clone ${REPO_URL}"
+                }
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "Construction de l'image Docker..."
+                    
+                    // Créer le Dockerfile pour l'image
+                    writeFile file: 'Dockerfile', text: '''
+                        FROM nginx:alpine
+                        RUN apk update && apk add --no-cache net-tools iproute2 iputils
+                        COPY . /usr/share/nginx/html
+                        EXPOSE 80
+                    '''
+                    
+                    // Construire l'image Docker
+                    sh "docker build -t ${IMAGE_NAME} ."
+                    
+                    echo "Vérification de l'image construite..."
+                    sh 'docker images ${IMAGE_NAME}'
+                }
+            }
+        }
+        stage('Clean Docker') {
+            steps {
+                script {
+                    // Suppression des anciens conteneurs Docker si présents
+                    def containers = sh(script: 'docker ps -a -q', returnStdout: true).trim()
+                    if (containers) {
+                        sh "docker rm -f ${containers}"
+                    } else {
+                        echo 'Aucun conteneur à supprimer.'
+                    }
+
+                    // Suppression des anciennes images, sauf celle qui vient d'être construite
+                    sh 'docker rmi -f $(docker images -q | grep -v ${IMAGE_NAME})'
+                }
+            }
+        }
+        stage('Deploy Container') {
+            steps {
+                script {
+                    echo "Reconstruction de l'image Docker avant déploiement..."
+                    
+                    // Reconstruire l'image Docker (utile si le contexte change)
+                    sh "docker build -t ${IMAGE_NAME} ."
+                    
+                    echo "Déploiement du conteneur..."
+                    
+                    // Lancer le conteneur en mode détaché
+                    sh "docker run -d --name ${CONTAINER_NAME} -p 8088:80 ${IMAGE_NAME}"
+                    
+                    // Récupérer l'IP du conteneur déployé
+                    def containerIp = sh(script: "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${CONTAINER_NAME}", returnStdout: true).trim()
+                    echo "Le conteneur est déployé avec succès. L'IP du conteneur est : ${containerIp}"
+                }
+            }
+        }
+    }
+    post {
+        always {
+            echo 'Pipeline terminée.'
+        }
+    }
+}
