@@ -1,77 +1,42 @@
 pipeline {
     agent any
     environment {
-        IMAGE_NAME = 'myapp-image'
-        CONTAINER_NAME = 'myapp'
+        DOCKER_IMAGE_NAME = 'myapp-image'
         REPO_URL = 'https://github.com/LaSkyMania/projet-Devops.git'
+        BRANCH_NAME = 'main'
     }
     stages {
         stage('Clean Workspace') {
             steps {
                 script {
-                    // Nettoyage des anciens fichiers Docker et de l'espace
-                    sh 'docker system prune -f'
-                    sh 'docker volume prune -f'
-                    sh 'docker network prune -f'
                     cleanWs()
                 }
             }
         }
-        stage('Clone Repository') {
+        stage('Clone GitHub Repo') {
             steps {
                 script {
-                    // Vérification et clonage du repo Git
-                    if (fileExists('projet-Devops')) {
-                        sh 'rm -rf projet-Devops'
-                    }
-                    sh "git clone ${REPO_URL}"
+                    git branch: "${BRANCH_NAME}", url: "${REPO_URL}"
                 }
             }
         }
         stage('Build Docker Image') {
             steps {
                 script {
-                    echo "Construction de l'image Docker..."
-                    
-                    // Assurez-vous que le Dockerfile est dans le bon répertoire
-                    // et qu'il n'est pas réécrit dans cette étape.
-                    // Le Dockerfile existant sera utilisé directement.
+                    // Créer le Dockerfile avec la version mise à jour
+                    sh '''
+                        echo "FROM nginx
+                        RUN apt update && apt install -y net-tools iproute2 iputils-ping ssh vim
+                        COPY . /usr/share/nginx/html
+                        EXPOSE 80
+                        " > Dockerfile
+                    '''
                     
                     // Construire l'image Docker
-                    sh "docker build -t ${IMAGE_NAME} ./projet-Devops"
+                    sh "docker build -t ${DOCKER_IMAGE_NAME} ."
                     
-                    echo "Vérification de l'image construite..."
-                    sh 'docker images ${IMAGE_NAME}'
-                }
-            }
-        }
-        stage('Clean Docker') {
-            steps {
-                script {
-                    // Suppression des anciens conteneurs Docker si présents
-                    def containers = sh(script: 'docker ps -a -q', returnStdout: true).trim()
-                    if (containers) {
-                        sh "docker rm -f ${containers}"
-                    } else {
-                        echo 'Aucun conteneur à supprimer.'
-                    }
-
-                    // Suppression des anciennes images, sauf celle qui vient d'être construite
-                    sh 'docker rmi -f $(docker images -q | grep -v ${IMAGE_NAME})'
-                }
-            }
-        }
-        stage('Deploy Container') {
-            steps {
-                script {
-                    echo "Déploiement du conteneur..."
-                    
-                    // Lancer le conteneur en mode détaché
-                    sh "docker run -d --name ${CONTAINER_NAME} -p 8088:80 ${IMAGE_NAME}"
-                    
-                    // Récupérer l'IP du conteneur déployé
-                    def containerIp = sh(script: "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${CONTAINER_NAME}", returnStdout: true).trim()
-                    echo "Le conteneur est déployé avec succès. L'IP du conteneur est : ${containerIp}"
+                    // Vérifier la construction de l'image
+                    sh "docker images ${DOCKER_IMAGE_NAME}"
                 }
             }
         }
