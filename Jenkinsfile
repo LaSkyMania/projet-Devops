@@ -1,6 +1,5 @@
 pipeline {
     agent any
-
     stages {
         stage('Clean Workspace') {
             steps {
@@ -9,10 +8,9 @@ pipeline {
                 }
             }
         }
-
         stage('Clone GitHub Repo') {
             steps {
-                git 'https://github.com/LaSkyMania/projet-Devops.git'
+                git branch: 'main', url: 'https://github.com/LaSkyMania/projet-Devops.git'
             }
         }
     }
