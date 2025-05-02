@@ -33,16 +33,12 @@ pipeline {
                 script {
                     echo "Construction de l'image Docker..."
                     
-                    // Créer le Dockerfile pour l'image
-                    writeFile file: 'Dockerfile', text: '''
-                        FROM nginx:alpine
-                        RUN apk update && apk add --no-cache net-tools iproute2 iputils
-                        COPY . /usr/share/nginx/html
-                        EXPOSE 80
-                    '''
+                    // Assurez-vous que le Dockerfile est dans le bon répertoire
+                    // et qu'il n'est pas réécrit dans cette étape.
+                    // Le Dockerfile existant sera utilisé directement.
                     
                     // Construire l'image Docker
-                    sh "docker build -t ${IMAGE_NAME} ."
+                    sh "docker build -t ${IMAGE_NAME} ./projet-Devops"
                     
                     echo "Vérification de l'image construite..."
                     sh 'docker images ${IMAGE_NAME}'
@@ -68,11 +64,6 @@ pipeline {
         stage('Deploy Container') {
             steps {
                 script {
-                    echo "Reconstruction de l'image Docker avant déploiement..."
-                    
-                    // Reconstruire l'image Docker (utile si le contexte change)
-                    sh "docker build -t ${IMAGE_NAME} ."
-                    
                     echo "Déploiement du conteneur..."
                     
                     // Lancer le conteneur en mode détaché
