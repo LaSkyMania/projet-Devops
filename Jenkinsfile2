@@ -2,6 +2,7 @@ pipeline {
     agent any
     environment {
         DOCKER_IMAGE_NAME = 'myapp-image'
+        CONTAINER_NAME = 'myapp'
         REPO_URL = 'https://github.com/LaSkyMania/projet-Devops.git'
         BRANCH_NAME = 'main'
     }
@@ -9,13 +10,14 @@ pipeline {
         stage('Clean Workspace') {
             steps {
                 script {
-                    cleanWs()
+                    cleanWs()  // Nettoie le workspace avant chaque exécution
                 }
             }
         }
         stage('Clone GitHub Repo') {
             steps {
                 script {
+                    // Clone le repository GitHub
                     git branch: "${BRANCH_NAME}", url: "${REPO_URL}"
                 }
             }
@@ -23,20 +25,30 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Créer le Dockerfile avec la version mise à jour
-                    sh '''
-                        echo "FROM nginx
-                        RUN apt update && apt install -y net-tools iproute2 iputils-ping ssh vim
-                        COPY . /usr/share/nginx/html
-                        EXPOSE 80
-                        " > Dockerfile
-                    '''
-                    
                     // Construire l'image Docker
                     sh "docker build -t ${DOCKER_IMAGE_NAME} ."
                     
                     // Vérifier la construction de l'image
                     sh "docker images ${DOCKER_IMAGE_NAME}"
+                }
+            }
+        }
+        stage('Deploy Container') {
+            steps {
+                script {
+                    // Suppression des anciens conteneurs si nécessaire
+                    def containers = sh(script: 'docker ps -a -q', returnStdout: true).trim()
+                    if (containers) {
+                        sh "docker rm -f ${containers}"
+                    }
+
+                    // Lancer le conteneur à partir de l'image construite
+                    echo "Lancement du conteneur..."
+                    sh "docker run -d --name ${CONTAINER_NAME} -p 8088:80 ${DOCKER_IMAGE_NAME}"
+                    
+                    // Récupérer l'IP du conteneur
+                    def containerIp = sh(script: "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${CONTAINER_NAME}", returnStdout: true).trim()
+                    echo "Le conteneur est déployé avec succès. L'IP du conteneur est : ${containerIp}"
                 }
             }
         }
