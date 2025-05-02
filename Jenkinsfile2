@@ -10,7 +10,7 @@ pipeline {
         stage('Clean Workspace') {
             steps {
                 script {
-                    cleanWs()  // Nettoie le workspace avant chaque exécution
+                    deleteDir()  // Nettoie le workspace avant chaque exécution
                 }
             }
         }
